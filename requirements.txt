@@ -3,3 +3,5 @@ numpy
 openpyxl
 gdown
 jupyter
+streamlit
+plotly

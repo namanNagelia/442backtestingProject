@@ -67,7 +67,42 @@ The data files are too large for GitHub, so they're hosted on Google Drive.
 
 ### 7. Run the Analysis
 
+You have **two equivalent ways** to run the analysis — pick whichever you prefer.
+
+#### Option A — Notebook (what you had before)
+
 Click on each cell in order and press **Shift + Enter** to run them one by one, or go to **Cell > Run All** in the menu bar.
+
+#### Option B — Python pipeline + Streamlit dashboard (recommended for sharing)
+
+The notebook has been extracted into plain Python modules in `project/` so the pipeline can be run from the command line and results can be viewed in an interactive dashboard.
+
+1. **(Once) Download the data** — same ~8 GB Google Drive pull as the notebook:
+   ```
+   python project/setup_data.py
+   ```
+   Files already in `data/` are skipped, so re-running is safe.
+
+2. **Run the pipeline** — load → clean+merge → z-score, writing CSVs to `cleaned_data/`:
+   ```
+   python project/main.py
+   ```
+   You'll see progress for each step and the final row counts. It produces:
+   - `cleaned_data/cleaned_merged_data.csv`
+   - `cleaned_data/ff_factors_clean.csv`
+   - `cleaned_data/cleaned_merged_zscored.csv`
+   - `cleaned_data/pipeline_stats.json` (used by the dashboard)
+
+3. **Open the dashboard** — interactive Streamlit app:
+   ```
+   streamlit run project/dashboard.py
+   ```
+   It opens in your browser and shows:
+   1. Pipeline summary (row counts through each stage)
+   2. Panel composition (stocks per year, FF49 industry breakdown)
+   3. Top 30 factors by missingness
+   4. Z-score sanity checks (pick a factor, see before/after histogram, mean, std)
+   5. Annual return distribution by year
 
 ---
 
@@ -75,6 +110,13 @@ Click on each cell in order and press **Shift + Enter** to run them one by one, 
 
 | File | What It Is |
 |------|-----------|
-| `main.ipynb` | The main notebook with all the code |
-| `data/` | Folder with all the datasets (downloaded via Step 6) |
+| `main.ipynb` | The original notebook with all the code (still works as-is) |
+| `project/setup_data.py` | One-time Google Drive downloader |
+| `project/step1_data_loading.py` | Reads the 5 raw source files into DataFrames |
+| `project/step2_data_cleaning.py` | CRSP filter, FF49 mapping, annual returns, OAP merge, FF-factor cleaning |
+| `project/step3_zscoring.py` | Industry-year z-scoring of the 209 factor columns |
+| `project/main.py` | Runs steps 1→2→3 end-to-end and writes outputs |
+| `project/dashboard.py` | Streamlit dashboard reading the outputs |
+| `data/` | Raw datasets (downloaded via step 6 / `setup_data.py`) |
+| `cleaned_data/` | Pipeline outputs written by `project/main.py` |
 | `requirements.txt` | List of Python packages needed |
