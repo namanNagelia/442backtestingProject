@@ -18,12 +18,14 @@ If you don't have Python installed yet:
 ### 2. Download This Project
 
 **Option A — If you have Git:**
+
 ```
 git clone <your-repo-url-here>
 cd backtestingProject
 ```
 
 **Option B — No Git:**
+
 1. On the GitHub page, click the green **"Code"** button
 2. Click **"Download ZIP"**
 3. Unzip the folder somewhere you can find it (like your Desktop)
@@ -34,6 +36,7 @@ cd backtestingProject
 - **Windows:** Open **Command Prompt** (search for "cmd" in the Start menu)
 
 Then navigate to the project folder. For example, if it's on your Desktop:
+
 ```
 cd Desktop/backtestingProject
 ```
@@ -41,6 +44,7 @@ cd Desktop/backtestingProject
 ### 4. Install Required Packages
 
 Copy and paste this into your terminal and press Enter:
+
 ```
 pip install -r requirements.txt
 ```
@@ -50,6 +54,7 @@ Wait for everything to finish installing. You'll see a bunch of text scrolling �
 ### 5. Open the Notebook
 
 Copy and paste this into your terminal and press Enter:
+
 ```
 jupyter notebook
 ```
@@ -69,24 +74,28 @@ The data files are too large for GitHub, so they're hosted on Google Drive.
 
 You have **two equivalent ways** to run the analysis — pick whichever you prefer.
 
-#### Option A — Notebook (what you had before)
+#### Option A — Notebook
 
 Click on each cell in order and press **Shift + Enter** to run them one by one, or go to **Cell > Run All** in the menu bar.
 
-#### Option B — Python pipeline + Streamlit dashboard (recommended for sharing)
+#### Option B — Python pipeline + Streamlit dashboard
 
 The notebook has been extracted into plain Python modules in `project/` so the pipeline can be run from the command line and results can be viewed in an interactive dashboard.
 
 1. **(Once) Download the data** — same ~8 GB Google Drive pull as the notebook:
+
    ```
    python project/setup_data.py
    ```
+
    Files already in `data/` are skipped, so re-running is safe.
 
 2. **Run the pipeline** — load → clean+merge → z-score, writing CSVs to `cleaned_data/`:
+
    ```
    python project/main.py
    ```
+
    You'll see progress for each step and the final row counts. It produces:
    - `cleaned_data/cleaned_merged_data.csv`
    - `cleaned_data/ff_factors_clean.csv`
@@ -108,15 +117,15 @@ The notebook has been extracted into plain Python modules in `project/` so the p
 
 ## Project Files
 
-| File | What It Is |
-|------|-----------|
-| `main.ipynb` | The original notebook with all the code (still works as-is) |
-| `project/setup_data.py` | One-time Google Drive downloader |
-| `project/step1_data_loading.py` | Reads the 5 raw source files into DataFrames |
+| File                             | What It Is                                                               |
+| -------------------------------- | ------------------------------------------------------------------------ |
+| `main.ipynb`                     | The original notebook with all the code (still works as-is)              |
+| `project/setup_data.py`          | One-time Google Drive downloader                                         |
+| `project/step1_data_loading.py`  | Reads the 5 raw source files into DataFrames                             |
 | `project/step2_data_cleaning.py` | CRSP filter, FF49 mapping, annual returns, OAP merge, FF-factor cleaning |
-| `project/step3_zscoring.py` | Industry-year z-scoring of the 209 factor columns |
-| `project/main.py` | Runs steps 1→2→3 end-to-end and writes outputs |
-| `project/dashboard.py` | Streamlit dashboard reading the outputs |
-| `data/` | Raw datasets (downloaded via step 6 / `setup_data.py`) |
-| `cleaned_data/` | Pipeline outputs written by `project/main.py` |
-| `requirements.txt` | List of Python packages needed |
+| `project/step3_zscoring.py`      | Industry-year z-scoring of the 209 factor columns                        |
+| `project/main.py`                | Runs steps 1→2→3 end-to-end and writes outputs                           |
+| `project/dashboard.py`           | Streamlit dashboard reading the outputs                                  |
+| `data/`                          | Raw datasets (downloaded via step 6 / `setup_data.py`)                   |
+| `cleaned_data/`                  | Pipeline outputs written by `project/main.py`                            |
+| `requirements.txt`               | List of Python packages needed                                           |

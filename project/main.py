@@ -20,6 +20,8 @@ if _HERE not in sys.path:
 import step1_data_loading as step1  # noqa: E402
 import step2_data_cleaning as step2  # noqa: E402
 import step3_zscoring as step3  # noqa: E402
+import step4_inSampleFM as step4  # noqa: E402
+import step5_factor_selection as step5  # noqa: E402
 
 
 def _missing_data_top(merged: pd.DataFrame, n: int = 30) -> pd.Series:
@@ -47,10 +49,23 @@ def run_pipeline(data_dir: str = "data", output_dir: str = "cleaned_data") -> Di
     merged_z = step3.zscore_by_industry_year(cleaned["merged"])
     cleaned["merged_z"] = merged_z
 
-    # Persist artifacts the dashboard reads later.
+    print("\n" + "=" * 60)
+    print("STEP 4: In-sample Fama-MacBeth regressions")
+    print("=" * 60)
+    fm_df = step4.run_fama_macbeth(merged_z)
+    cleaned["fm_results"] = fm_df
+
+    print("\n" + "=" * 60)
+    print("STEP 5: Factor selection")
+    print("=" * 60)
+    final_factors = step5.select_factors(fm_df)
+    cleaned["final_factors"] = final_factors
+
     merged_path = os.path.join(output_dir, "cleaned_merged_data.csv")
     ff_path = os.path.join(output_dir, "ff_factors_clean.csv")
     zscored_path = os.path.join(output_dir, "cleaned_merged_zscored.csv")
+    fm_path = os.path.join(output_dir, "fm_regression_results.csv")
+    final_path = os.path.join(output_dir, "final_factors.csv")
 
     print("\nWriting outputs...")
     cleaned["merged"].to_csv(merged_path, index=False)
@@ -59,6 +74,10 @@ def run_pipeline(data_dir: str = "data", output_dir: str = "cleaned_data") -> Di
     print(f"  {ff_path}")
     merged_z.to_csv(zscored_path, index=False)
     print(f"  {zscored_path}")
+    fm_df.to_csv(fm_path, index=False)
+    print(f"  {fm_path}")
+    final_factors.to_csv(final_path, index=False)
+    print(f"  {final_path}")
 
     stats = {
         "crsp_cleaned_rows": int(len(cleaned["crsp_cleaned"])),
@@ -70,6 +89,12 @@ def run_pipeline(data_dir: str = "data", output_dir: str = "cleaned_data") -> Di
         "crsp_year_max": int(cleaned["crsp_cleaned"]["YEAR"].max()),
         "missing_pct_top30": _missing_data_top(cleaned["merged"]).round(3).to_dict(),
         "bm_mean_after_zscore": float(merged_z["BM"].mean()),
+        "fm_in_sample_start": int(step4.IN_SAMPLE_START),
+        "fm_in_sample_end": int(step4.IN_SAMPLE_END),
+        "fm_factors_analyzed": int(len(fm_df)),
+        "fm_factors_above_threshold": int((fm_df["abs_t"] >= step5.T_THRESHOLD).sum()),
+        "final_factor_count": int(len(final_factors)),
+        "final_factor_t_threshold": float(step5.T_THRESHOLD),
     }
     stats_path = os.path.join(output_dir, "pipeline_stats.json")
     with open(stats_path, "w") as f:
@@ -78,6 +103,7 @@ def run_pipeline(data_dir: str = "data", output_dir: str = "cleaned_data") -> Di
 
     print("\nPipeline complete.")
     print(f"  BM z-scored mean: {stats['bm_mean_after_zscore']:.6f} (should be ~0)")
+    print(f"  Final model: {stats['final_factor_count']} factors")
     return cleaned
 
 
