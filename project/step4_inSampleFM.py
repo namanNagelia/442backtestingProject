@@ -26,7 +26,12 @@ def run_fama_macbeth(
     in_end: int = IN_SAMPLE_END,
     min_obs_per_year: int = MIN_OBS_PER_YEAR,
     id_cols: Iterable[str] = ID_COLS,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return (summary_df, yearly_coefs_df).
+
+    - summary_df: Factor / Avg_Premium / Std_Premium / t_stat / N_Years / abs_t.
+    - yearly_coefs_df: long-form Year / Factor / Coef (one row per factor per year).
+    """
     id_cols = list(id_cols)
     factor_cols = [c for c in merged_z.columns if c not in id_cols]
 
@@ -40,6 +45,7 @@ def run_fama_macbeth(
     )
 
     yearly_coefs: dict[str, list[float]] = defaultdict(list)
+    years_by_factor: dict[str, list[int]] = defaultdict(list)
     years_used = 0
 
     for year in sorted(in_sample["RETURN_YEAR"].unique()):
@@ -53,21 +59,27 @@ def run_fama_macbeth(
         model = sm.OLS(y, X).fit()
 
         for col in factor_cols:
-            yearly_coefs[col].append(model.params.get(col, np.nan))
+            coef = model.params.get(col, np.nan)
+            yearly_coefs[col].append(coef)
+            years_by_factor[col].append(int(year))
         years_used += 1
         print(f"  Year {year}: {len(year_data_clean):,} obs")
 
     print(f"Completed FM regressions across {years_used} years")
 
     rows = []
+    long_rows = []
     for col in factor_cols:
-        coefs = [c for c in yearly_coefs[col] if not np.isnan(c)]
-        if len(coefs) < 5:
+        coefs = yearly_coefs[col]
+        years = years_by_factor[col]
+        clean_coefs = [c for c in coefs if not np.isnan(c)]
+        if len(clean_coefs) < 5:
             continue
-        avg_premium = float(np.mean(coefs))
-        std_premium = float(np.std(coefs, ddof=1))
+        avg_premium = float(np.mean(clean_coefs))
+        std_premium = float(np.std(clean_coefs, ddof=1))
         t_stat = (
-            avg_premium / (std_premium / np.sqrt(len(coefs))) if std_premium > 0 else 0.0
+            avg_premium / (std_premium / np.sqrt(len(clean_coefs)))
+            if std_premium > 0 else 0.0
         )
         rows.append(
             {
@@ -75,12 +87,17 @@ def run_fama_macbeth(
                 "Avg_Premium": avg_premium,
                 "Std_Premium": std_premium,
                 "t_stat": t_stat,
-                "N_Years": len(coefs),
+                "N_Years": len(clean_coefs),
             }
         )
+        for y_, c_ in zip(years, coefs):
+            long_rows.append({"Year": y_, "Factor": col, "Coef": c_})
 
     fm_df = pd.DataFrame(rows)
     fm_df["abs_t"] = fm_df["t_stat"].abs()
     fm_df = fm_df.sort_values("abs_t", ascending=False).reset_index(drop=True)
+
+    yearly_coefs_df = pd.DataFrame(long_rows).sort_values(["Factor", "Year"]).reset_index(drop=True)
+
     print(f"Factors analyzed: {len(fm_df)}")
-    return fm_df
+    return fm_df, yearly_coefs_df
