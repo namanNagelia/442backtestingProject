@@ -67,37 +67,51 @@ def run_pipeline(data_dir: str = "data", output_dir: str = "cleaned_data") -> Di
     )
 
     paths = {
-        "merged": os.path.join(output_dir, "cleaned_merged_data.csv"),
-        "ff": os.path.join(output_dir, "ff_factors_clean.csv"),
-        "zscored": os.path.join(output_dir, "cleaned_merged_zscored.csv"),
-        "fm": os.path.join(output_dir, "fm_regression_results.csv"),
-        "fm_yearly": os.path.join(output_dir, "fm_yearly_coefs.csv"),
-        "final": os.path.join(output_dir, "final_factors.csv"),
-        "oos_scores": os.path.join(output_dir, "oos_scores.csv"),
-        "oos_yearly_deciles": os.path.join(output_dir, "oos_yearly_decile_returns.csv"),
-        "oos_monthly": os.path.join(output_dir, "oos_monthly_portfolio.csv"),
-        "oos_capm": os.path.join(output_dir, "oos_reg_coefs_capm.csv"),
-        "oos_4f": os.path.join(output_dir, "oos_reg_coefs_4f.csv"),
-        "oos_summary": os.path.join(output_dir, "oos_performance_summary.csv"),
-        "oos_ic": os.path.join(output_dir, "oos_ic_yearly.csv"),
-        "oos_ic_summary": os.path.join(output_dir, "oos_ic_summary.csv"),
+        "merged": os.path.join(output_dir, "cleaned_merged_data.parquet"),
+        "ff": os.path.join(output_dir, "ff_factors_clean.parquet"),
+        "zscored": os.path.join(output_dir, "cleaned_merged_zscored.parquet"),
+        "fm": os.path.join(output_dir, "fm_regression_results.parquet"),
+        "fm_yearly": os.path.join(output_dir, "fm_yearly_coefs.parquet"),
+        "final": os.path.join(output_dir, "final_factors.parquet"),
+        "oos_scores": os.path.join(output_dir, "oos_scores.parquet"),
+        "oos_yearly_deciles": os.path.join(output_dir, "oos_yearly_decile_returns.parquet"),
+        "oos_monthly": os.path.join(output_dir, "oos_monthly_portfolio.parquet"),
+        "oos_capm": os.path.join(output_dir, "oos_reg_coefs_capm.parquet"),
+        "oos_4f": os.path.join(output_dir, "oos_reg_coefs_4f.parquet"),
+        "oos_summary": os.path.join(output_dir, "oos_performance_summary.parquet"),
+        "oos_ic": os.path.join(output_dir, "oos_ic_yearly.parquet"),
+        "oos_ic_summary": os.path.join(output_dir, "oos_ic_summary.parquet"),
     }
 
+    # Sample big panels for dashboard / GitHub (full ~102K rows × 223 cols > 100MB).
+    # 30K random rows preserve distribution shape for the dashboard plots.
+    SAMPLE_N = 30_000
+    merged_sample = (
+        cleaned["merged"].sample(n=SAMPLE_N, random_state=42)
+        .sort_values("RETURN_YEAR").reset_index(drop=True)
+        if len(cleaned["merged"]) > SAMPLE_N else cleaned["merged"]
+    )
+    zscored_sample = (
+        merged_z.sample(n=SAMPLE_N, random_state=42)
+        .sort_values("RETURN_YEAR").reset_index(drop=True)
+        if len(merged_z) > SAMPLE_N else merged_z
+    )
+
     print("\nWriting outputs...")
-    cleaned["merged"].to_csv(paths["merged"], index=False);              print(f"  {paths['merged']}")
-    cleaned["ff_all"].to_csv(paths["ff"], index=False);                   print(f"  {paths['ff']}")
-    merged_z.to_csv(paths["zscored"], index=False);                       print(f"  {paths['zscored']}")
-    fm_df.to_csv(paths["fm"], index=False);                               print(f"  {paths['fm']}")
-    yearly_coefs.to_csv(paths["fm_yearly"], index=False);                 print(f"  {paths['fm_yearly']}")
-    final_factors.to_csv(paths["final"], index=False);                    print(f"  {paths['final']}")
-    scored.to_csv(paths["oos_scores"], index=False);                      print(f"  {paths['oos_scores']}")
-    perf["yearly_decile_returns"].to_csv(paths["oos_yearly_deciles"], index=False); print(f"  {paths['oos_yearly_deciles']}")
-    perf["monthly_portfolio"].to_csv(paths["oos_monthly"], index=False); print(f"  {paths['oos_monthly']}")
-    perf["reg_coefs_capm"].to_csv(paths["oos_capm"], index=False);       print(f"  {paths['oos_capm']}")
-    perf["reg_coefs_4f"].to_csv(paths["oos_4f"], index=False);           print(f"  {paths['oos_4f']}")
-    perf["summary"].to_csv(paths["oos_summary"], index=False);            print(f"  {paths['oos_summary']}")
-    perf["ic_yearly"].to_csv(paths["oos_ic"], index=False);               print(f"  {paths['oos_ic']}")
-    perf["ic_summary"].to_csv(paths["oos_ic_summary"], index=False);      print(f"  {paths['oos_ic_summary']}")
+    merged_sample.to_parquet(paths["merged"], index=False, compression="zstd", compression_level=19); print(f"  {paths['merged']}")
+    cleaned["ff_all"].to_parquet(paths["ff"], index=False);                           print(f"  {paths['ff']}")
+    zscored_sample.to_parquet(paths["zscored"], index=False, compression="zstd", compression_level=19); print(f"  {paths['zscored']}")
+    fm_df.to_parquet(paths["fm"], index=False);                                       print(f"  {paths['fm']}")
+    yearly_coefs.to_parquet(paths["fm_yearly"], index=False);                         print(f"  {paths['fm_yearly']}")
+    final_factors.to_parquet(paths["final"], index=False);                            print(f"  {paths['final']}")
+    scored.to_parquet(paths["oos_scores"], index=False);                              print(f"  {paths['oos_scores']}")
+    perf["yearly_decile_returns"].to_parquet(paths["oos_yearly_deciles"], index=False); print(f"  {paths['oos_yearly_deciles']}")
+    perf["monthly_portfolio"].to_parquet(paths["oos_monthly"], index=False);          print(f"  {paths['oos_monthly']}")
+    perf["reg_coefs_capm"].to_parquet(paths["oos_capm"], index=False);                print(f"  {paths['oos_capm']}")
+    perf["reg_coefs_4f"].to_parquet(paths["oos_4f"], index=False);                    print(f"  {paths['oos_4f']}")
+    perf["summary"].to_parquet(paths["oos_summary"], index=False);                    print(f"  {paths['oos_summary']}")
+    perf["ic_yearly"].to_parquet(paths["oos_ic"], index=False);                       print(f"  {paths['oos_ic']}")
+    perf["ic_summary"].to_parquet(paths["oos_ic_summary"], index=False);              print(f"  {paths['oos_ic_summary']}")
 
     summary_kv = dict(zip(perf["summary"]["metric"], perf["summary"]["value"]))
     ic_kv = dict(zip(perf["ic_summary"]["metric"], perf["ic_summary"]["value"]))

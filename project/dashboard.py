@@ -15,19 +15,19 @@ CLEANED_DIR = "cleaned_data"
 P = lambda name: os.path.join(CLEANED_DIR, name)
 
 PATHS = {
-    "merged": P("cleaned_merged_data.csv"),
-    "zscored": P("cleaned_merged_zscored.csv"),
+    "merged": P("cleaned_merged_data.parquet"),
+    "zscored": P("cleaned_merged_zscored.parquet"),
     "stats": P("pipeline_stats.json"),
-    "fm": P("fm_regression_results.csv"),
-    "fm_yearly": P("fm_yearly_coefs.csv"),
-    "final": P("final_factors.csv"),
-    "oos_scores": P("oos_scores.csv"),
-    "oos_yearly_deciles": P("oos_yearly_decile_returns.csv"),
-    "oos_monthly": P("oos_monthly_portfolio.csv"),
-    "oos_capm": P("oos_reg_coefs_capm.csv"),
-    "oos_4f": P("oos_reg_coefs_4f.csv"),
-    "oos_summary": P("oos_performance_summary.csv"),
-    "oos_ic": P("oos_ic_yearly.csv"),
+    "fm": P("fm_regression_results.parquet"),
+    "fm_yearly": P("fm_yearly_coefs.parquet"),
+    "final": P("final_factors.parquet"),
+    "oos_scores": P("oos_scores.parquet"),
+    "oos_yearly_deciles": P("oos_yearly_decile_returns.parquet"),
+    "oos_monthly": P("oos_monthly_portfolio.parquet"),
+    "oos_capm": P("oos_reg_coefs_capm.parquet"),
+    "oos_4f": P("oos_reg_coefs_4f.parquet"),
+    "oos_summary": P("oos_performance_summary.parquet"),
+    "oos_ic": P("oos_ic_yearly.parquet"),
 }
 
 ID_COLS = [
@@ -59,8 +59,8 @@ def load_all():
         if not os.path.exists(PATHS[k]):
             return None
     out = {
-        "merged": pd.read_csv(PATHS["merged"], low_memory=False),
-        "zscored": pd.read_csv(PATHS["zscored"], low_memory=False),
+        "merged": pd.read_parquet(PATHS["merged"]),
+        "zscored": pd.read_parquet(PATHS["zscored"]),
     }
     with open(PATHS["stats"]) as f:
         out["stats"] = json.load(f)
@@ -69,7 +69,7 @@ def load_all():
         "oos_yearly_deciles", "oos_monthly", "oos_capm", "oos_4f",
         "oos_summary", "oos_ic",
     ):
-        out[k] = pd.read_csv(PATHS[k]) if os.path.exists(PATHS[k]) else None
+        out[k] = pd.read_parquet(PATHS[k]) if os.path.exists(PATHS[k]) else None
     return out
 
 

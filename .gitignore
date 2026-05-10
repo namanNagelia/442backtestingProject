@@ -1,4 +1,5 @@
 venv
 .DS_Store
 data/
-cleaned_data/
+__pycache__/
+*.pyc
