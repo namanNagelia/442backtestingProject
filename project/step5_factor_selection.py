@@ -1,25 +1,18 @@
-"""Step 5: Filter multivariate FM output by |t| >= 1.5 and correct sign (+1)."""
+"""Step 5: Take top N multivariate FM factors by |t|. Sign carried in t_stat weight."""
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
-T_THRESHOLD = 1.5
-EXPECTED_SIGN = 1
+TOP_N = 25
 
 
-def select_factors(
-    fm_df: pd.DataFrame,
-    t_threshold: float = T_THRESHOLD,
-    expected_sign: int = EXPECTED_SIGN,
-) -> pd.DataFrame:
-    above = fm_df[fm_df["abs_t"] >= t_threshold].copy()
-    sign_ok = above[np.sign(above["Avg_Premium"]) == expected_sign].copy()
-    dropped = above[np.sign(above["Avg_Premium"]) != expected_sign]
-
-    final = sign_ok.sort_values("abs_t", ascending=False)[
-        ["Factor", "Avg_Premium", "t_stat", "abs_t", "N_Years"]
-    ].reset_index(drop=True)
-    print(f"|t|>={t_threshold}: {len(above)}, sign-ok: {len(final)}, dropped wrong-sign: {len(dropped)}")
+def select_factors(fm_df: pd.DataFrame, top_n: int = TOP_N) -> pd.DataFrame:
+    final = (
+        fm_df.sort_values("abs_t", ascending=False)
+        .head(top_n)[["Factor", "Avg_Premium", "t_stat", "abs_t", "N_Years"]]
+        .reset_index(drop=True)
+    )
+    n_neg = int((final["t_stat"] < 0).sum())
+    print(f"Top {top_n} by |t| (no sign filter): {n_neg} negative-premium factors")
     print(final[["Factor", "Avg_Premium", "t_stat"]].to_string(index=False))
     return final
