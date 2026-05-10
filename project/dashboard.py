@@ -28,6 +28,7 @@ PATHS = {
     "oos_4f": P("oos_reg_coefs_4f.parquet"),
     "oos_summary": P("oos_performance_summary.parquet"),
     "oos_ic": P("oos_ic_yearly.parquet"),
+    "ff": P("ff_factors_clean.parquet"),
 }
 
 ID_COLS = [
@@ -67,7 +68,7 @@ def load_all():
     for k in (
         "fm", "fm_yearly", "final", "oos_scores",
         "oos_yearly_deciles", "oos_monthly", "oos_capm", "oos_4f",
-        "oos_summary", "oos_ic",
+        "oos_summary", "oos_ic", "ff",
     ):
         out[k] = pd.read_parquet(PATHS[k]) if os.path.exists(PATHS[k]) else None
     return out
@@ -101,6 +102,7 @@ oos_capm = data["oos_capm"]
 oos_4f = data["oos_4f"]
 oos_summary = data["oos_summary"]
 oos_ic = data["oos_ic"]
+ff_all = data["ff"]
 
 factor_cols = [c for c in merged.columns if c not in ID_COLS]
 
@@ -133,8 +135,8 @@ st.caption(
     f"Panel years: {stats['crsp_year_min']}–{stats['crsp_year_max']}."
 )
 
-tab_panel, tab_z, tab_fm, tab_final, tab_oos = st.tabs(
-    ["Panel", "Z-scored data", "In-sample FM", "Final factors", "Out-of-sample"]
+tab_panel, tab_z, tab_fm, tab_final, tab_oos, tab_bench = st.tabs(
+    ["Panel", "Z-scored data", "In-sample FM", "Final factors", "Out-of-sample", "Benchmarks"]
 )
 
 # =======================================================================
@@ -487,3 +489,156 @@ with tab_oos:
                 f"hit rate = {stats.get('oos_ic_hit_rate', 0):.1%}. "
                 "Dashed line is the OOS mean IC."
             )
+
+# =======================================================================
+# TAB 6 — BENCHMARKS (Strategy vs FF / Carhart factors)
+# =======================================================================
+with tab_bench:
+    if oos_monthly is None or ff_all is None:
+        st.info("Need OOS monthly portfolio and FF factors. Re-run `python project/main.py`.")
+    else:
+        st.caption(
+            "Apples-to-apples comparison of the L/S strategy vs each Carhart factor "
+            "as a standalone monthly return series over the OOS window. "
+            "MKT_RF, SMB, HML, UMD are the published Fama-French / Carhart returns."
+        )
+
+        import numpy as np
+
+        mp = oos_monthly[["YYYYMM", "ls"]].copy()
+        mp["YYYYMM"] = mp["YYYYMM"].astype(int)
+        bench = mp.merge(ff_all, on="YYYYMM", how="inner").dropna(
+            subset=["ls", "MKT_RF", "SMB", "HML", "UMD"]
+        )
+        bench["date"] = pd.to_datetime(bench["YYYYMM"].astype(str), format="%Y%m")
+        bench = bench.sort_values("date").reset_index(drop=True)
+
+        SERIES = {
+            "L/S strategy": "ls",
+            "MKT_RF": "MKT_RF",
+            "SMB": "SMB",
+            "HML": "HML",
+            "UMD": "UMD",
+        }
+        SERIES_COLORS = {
+            "L/S strategy": "#1F77B4",
+            "MKT_RF": "#FF7F0E",
+            "SMB": "#2CA02C",
+            "HML": "#D62728",
+            "UMD": "#9467BD",
+        }
+
+        st.subheader("Annualized risk/return — OOS window")
+        rows = []
+        for label, col in SERIES.items():
+            x = bench[col].to_numpy()
+            mean_a = float(np.mean(x)) * 12
+            std_a = float(np.std(x, ddof=1)) * np.sqrt(12)
+            sharpe = mean_a / std_a if std_a > 0 else 0.0
+            cum = float(np.prod(1.0 + x) - 1.0)
+            hit = float((x > 0).mean())
+            rows.append({
+                "Series": label,
+                "Annual return": mean_a,
+                "Annual vol": std_a,
+                "Sharpe": sharpe,
+                "Cumulative": cum,
+                "Hit rate (m)": hit,
+            })
+        bench_summary = pd.DataFrame(rows)
+        st.dataframe(
+            bench_summary.style.format({
+                "Annual return": "{:.2%}",
+                "Annual vol": "{:.2%}",
+                "Sharpe": "{:.2f}",
+                "Cumulative": "{:.1%}",
+                "Hit rate (m)": "{:.1%}",
+            }),
+            use_container_width=True, hide_index=True,
+        )
+
+        st.subheader("Cumulative return — strategy vs each factor")
+        long_rows = []
+        for label, col in SERIES.items():
+            cum = (1.0 + bench[col]).cumprod() - 1.0
+            long_rows.append(pd.DataFrame({
+                "date": bench["date"], "series": label, "cum_return": cum.values,
+            }))
+        long_df = pd.concat(long_rows, ignore_index=True)
+        fig = px.line(
+            long_df, x="date", y="cum_return", color="series",
+            color_discrete_map=SERIES_COLORS,
+            labels={"date": "Month", "cum_return": "Cumulative return"},
+        )
+        fig.add_hline(y=0, line_dash="dot", line_color="gray")
+        fig.update_layout(height=420, margin=dict(l=10, r=10, t=10, b=10),
+                          legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption(
+            "L/S is the long-D10 / short-D1 portfolio (value-weighted). "
+            "Other lines are the published Carhart factor returns over the same months."
+        )
+
+        c1, c2 = st.columns([3, 2])
+        with c1:
+            st.subheader("Monthly return correlations")
+            corr = bench[list(SERIES.values())].corr()
+            corr.index = list(SERIES.keys())
+            corr.columns = list(SERIES.keys())
+            fig = px.imshow(
+                corr, text_auto=".2f", color_continuous_scale="RdBu_r",
+                zmin=-1, zmax=1, aspect="auto",
+            )
+            fig.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption(
+                "Low correlation between L/S and the Carhart factors is *desirable* — "
+                "it means the strategy adds diversifying exposure beyond known risk premia."
+            )
+
+        with c2:
+            st.subheader("Strategy loadings on each factor")
+            if oos_4f is not None:
+                load = oos_4f[oos_4f["term"] != "const"].copy()
+                load["sig"] = load["t_stat"].abs() >= 2.0
+                fig = px.bar(
+                    load.sort_values("coef"),
+                    x="coef", y="term", orientation="h",
+                    color="sig",
+                    color_discrete_map={True: "#2E8B57", False: "#9CA3AF"},
+                    labels={"coef": "β (4F regression)", "term": "Factor"},
+                )
+                fig.add_vline(x=0, line_color="black")
+                fig.update_layout(
+                    height=380, margin=dict(l=10, r=10, t=10, b=10),
+                    showlegend=False,
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                st.caption(
+                    f"Green = |t| ≥ 2 (statistically significant exposure). "
+                    f"4F R² = {stats.get('oos_r2_4f', 0):.2f}."
+                )
+
+        st.subheader("Why the comparison matters")
+        c1, c2, c3 = st.columns(3)
+        c1.metric(
+            "4F α (ann.)",
+            f"{stats.get('oos_alpha_4f_annualized', 0):.2%}",
+            delta=f"t={stats.get('oos_t_alpha_4f', 0):.2f}",
+        )
+        c2.metric(
+            "CAPM α (ann.)",
+            f"{stats.get('oos_alpha_capm_annualized', 0):.2%}",
+            delta=f"t={stats.get('oos_t_alpha_capm', 0):.2f}",
+        )
+        c3.metric(
+            "β_MKT (CAPM)",
+            f"{stats.get('oos_beta_capm_mkt', 0):.2f}",
+        )
+        st.markdown(
+            "**Interpretation.** After subtracting the contributions of MKT, SMB, HML, and UMD, "
+            f"the strategy still delivers **{stats.get('oos_alpha_4f_annualized', 0):.2%}/yr** of unexplained alpha "
+            f"(t = {stats.get('oos_t_alpha_4f', 0):.2f}). The β_MKT of "
+            f"{stats.get('oos_beta_capm_mkt', 0):.2f} is near-zero, so essentially none of the strategy's "
+            "return comes from broad market exposure — it's a genuine factor-selection edge."
+        )
