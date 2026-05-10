@@ -83,15 +83,21 @@ def run_pipeline(data_dir: str = "data", output_dir: str = "cleaned_data") -> Di
         "oos_ic_summary": os.path.join(output_dir, "oos_ic_summary.parquet"),
     }
 
-    # Sample big panels for dashboard / GitHub (full ~102K rows × 223 cols > 100MB).
-    # 30K random rows preserve distribution shape for the dashboard plots.
+    def _downcast(df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        f64 = out.select_dtypes(include="float64").columns
+        i64 = out.select_dtypes(include="int64").columns
+        out[f64] = out[f64].astype("float32")
+        out[i64] = out[i64].astype("int32")
+        return out
+
     SAMPLE_N = 30_000
-    merged_sample = (
+    merged_sample = _downcast(
         cleaned["merged"].sample(n=SAMPLE_N, random_state=42)
         .sort_values("RETURN_YEAR").reset_index(drop=True)
         if len(cleaned["merged"]) > SAMPLE_N else cleaned["merged"]
     )
-    zscored_sample = (
+    zscored_sample = _downcast(
         merged_z.sample(n=SAMPLE_N, random_state=42)
         .sort_values("RETURN_YEAR").reset_index(drop=True)
         if len(merged_z) > SAMPLE_N else merged_z
